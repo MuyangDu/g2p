@@ -179,9 +179,6 @@ class G2p(object):
                 pron = self.cmu[word][0]
             else: # predict for oov
                 pron = self.predict(word)
-            
-            print(word)   
-            print(pron)
 
             prons.extend(pron)
             prons.extend([" "])
