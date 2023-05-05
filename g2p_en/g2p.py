@@ -49,7 +49,7 @@ def construct_homograph_dictionary():
 #     return text.split()
 
 class G2p(object):
-    def __init__(self):
+    def __init__(self, additional_pronunciations={}):
         super().__init__()
         self.graphemes = ["<pad>", "<unk>", "</s>"] + list("abcdefghijklmnopqrstuvwxyz")
         self.phonemes = ["<pad>", "<unk>", "<s>", "</s>"] + ['AA0', 'AA1', 'AA2', 'AE0', 'AE1', 'AE2', 'AH0', 'AH1', 'AH2', 'AO0',
@@ -68,6 +68,7 @@ class G2p(object):
         self.idx2p = {idx: p for idx, p in enumerate(self.phonemes)}
 
         self.cmu = cmudict.dict()
+        self.additional_pronunciations = {key.lower(): value for key, value in additional_pronunciations.items()}
         self.load_variables()
         self.homograph2features = construct_homograph_dictionary()
 
@@ -172,10 +173,15 @@ class G2p(object):
                     pron = pron1
                 else:
                     pron = pron2
+            elif word in self.additional_pronunciations:
+                pron = self.additional_pronunciations[word]
             elif word in self.cmu:  # lookup CMU dict
                 pron = self.cmu[word][0]
             else: # predict for oov
                 pron = self.predict(word)
+            
+            print(word)   
+            print(pron)
 
             prons.extend(pron)
             prons.extend([" "])
