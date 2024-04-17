@@ -69,6 +69,8 @@ class G2p(object):
 
         self.cmu = cmudict.dict()
         self.additional_pronunciations = {key.lower(): value for key, value in additional_pronunciations.items()}
+        self.words = set(self.cmu.keys())
+        self.words.update(list(self.additional_pronunciations.keys()))
         self.load_variables()
         self.homograph2features = construct_homograph_dictionary()
 
@@ -145,6 +147,18 @@ class G2p(object):
 
         preds = [self.idx2p.get(idx, "<unk>") for idx in preds]
         return preds
+    
+    def word_break(self, word):
+        memo = {len(word): ['']}
+        ss = set(len(x) for x in self.words)
+        def sentences(i):
+            if i not in memo:
+                memo[i] = [word[i:j] + (tail and ' ' + tail)
+                           for j in [i + x for x in ss]
+                           if word[i:j] in self.words
+                           for tail in sentences(j)]
+            return memo[i]
+        return sentences(0)
 
     def __call__(self, text):
         # preprocessing
@@ -164,20 +178,37 @@ class G2p(object):
         # steps
         prons = []
         for word, pos in tokens:
+            pron = None
             if re.search("[a-z]", word) is None:
                 pron = [word]
-
+            elif word in self.additional_pronunciations:
+                pron = self.additional_pronunciations[word]
             elif word in self.homograph2features:  # Check homograph
                 pron1, pron2, pos1 = self.homograph2features[word]
                 if pos.startswith(pos1):
                     pron = pron1
                 else:
                     pron = pron2
-            elif word in self.additional_pronunciations:
-                pron = self.additional_pronunciations[word]
             elif word in self.cmu:  # lookup CMU dict
                 pron = self.cmu[word][0]
-            else: # predict for oov
+            
+            if pron is None:
+                sub_words = self.word_break(word)
+                sub_words = [sw.split(" ") for sw in sub_words]
+                sub_words.sort(key=len)
+                if len(sub_words) > 0 and len(sub_words[0]) == 2:
+                    sub_words = sub_words[0]
+                    if sub_words[0] in self.additional_pronunciations:
+                        pron = self.additional_pronunciations[sub_words[0]]
+                    else:
+                        pron = self.cmu[sub_words[0]][0]
+                    if sub_words[1] in self.additional_pronunciations:
+                        pron += self.additional_pronunciations[sub_words[1]]
+                    else:
+                        pron += self.cmu[sub_words[1]][0]
+                    # pron = self.cmu[sub_words[0]][0] + self.cmu[sub_words[1]][0]
+                    
+            if pron is None:
                 pron = self.predict(word)
 
             prons.extend(pron)
